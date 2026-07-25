@@ -1,208 +1,197 @@
-# MicroLearning Coach - Self-Hosting Guide
+# Self-Hosting Guide — MicroLearning Coach
 
-This guide explains how to export and deploy the MicroLearning Coach platform on your own server infrastructure.
+This guide covers everything you need to deploy this app on **Railway**, **Render**, or any **VPS/Docker** host.
+The app uses **Supabase** for database, auth, and file storage — no MySQL, no S3, no separate auth server needed.
 
-## Architecture Overview
-
-The application is a full-stack TypeScript project with the following components:
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Frontend | React 19 + Tailwind CSS 4 | Single-page application with PWA support |
-| Backend | Express 4 + tRPC 11 | API server with type-safe RPC procedures |
-| Database | MySQL 8+ / TiDB | Relational data store for all platform data |
-| File Storage | S3-compatible | Lesson media, certificates, and uploads |
-| AI Integration | OpenAI-compatible API | Lesson generation and content personalization |
+---
 
 ## Prerequisites
 
-Before deploying, ensure your server has the following installed:
+- A **Supabase** project (free tier works): https://supabase.com
+- A hosting account: Railway / Render / VPS with Docker
+- Your GitHub repo: https://github.com/Smarthinkerz/microlearning
 
-- **Node.js 20+** (LTS recommended)
-- **pnpm 9+** (package manager)
-- **MySQL 8.0+** or **TiDB** (database)
-- **S3-compatible storage** (AWS S3, MinIO, Cloudflare R2, etc.)
+---
 
-## Step 1: Export the Project
+## 1. Supabase Setup
 
-Download the project files from the Manus dashboard (Code panel) or clone from the exported GitHub repository.
+### 1a. Create a Supabase project
+1. Go to https://supabase.com → New Project
+2. Choose a region close to your users
+3. Save the **database password** — you will need it
 
-```bash
-# If exported to GitHub
-git clone https://github.com/your-org/microlearning-coach.git
-cd microlearning-coach
-```
+### 1b. Run the database schema
+1. In Supabase → **SQL Editor** → New Query
+2. Paste the entire contents of `supabase/schema.sql` from this repo
+3. Click **Run** — this creates all 35 tables
 
-## Step 2: Install Dependencies
+### 1c. Collect your Supabase credentials
+Go to **Project Settings → API** and copy:
 
-```bash
-pnpm install
-```
+| Variable | Where to find it |
+|---|---|
+| `SUPABASE_URL` | Project URL (e.g. `https://xxxx.supabase.co`) |
+| `SUPABASE_ANON_KEY` | `anon` / `public` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key (keep secret!) |
+| `SUPABASE_JWT_SECRET` | Project Settings → API → JWT Secret |
+| `DATABASE_URL` | Project Settings → Database → Connection string → **Transaction pooler** URI (port 6543) |
 
-## Step 3: Configure Environment Variables
+> **Important:** Use the **Transaction pooler** URI (port 6543), NOT the direct connection (port 5432).
 
-Create a `.env` file in the project root with the following variables:
+### 1d. Create the storage bucket
+In Supabase → **Storage** → New bucket:
+- Name: `media`
+- Public: **Yes** (so uploaded lesson media is publicly accessible)
+
+### 1e. Enable Email Auth
+In Supabase → **Authentication → Providers → Email**:
+- Enable email/password sign-in
+- Optionally disable "Confirm email" for faster testing
+
+---
+
+## 2. Environment Variables
+
+Set ALL of these in your hosting platform:
 
 ```env
-# Database
-DATABASE_URL=mysql://user:password@host:3306/microlearning_coach
+# ── Database ──────────────────────────────────────────────────────────────────
+DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-us-east-1.pooler.supabase.com:6543/postgres
 
-# Authentication (replace with your OAuth provider)
-JWT_SECRET=your-secure-random-secret-at-least-32-chars
-OAUTH_SERVER_URL=https://your-oauth-provider.com
-VITE_OAUTH_PORTAL_URL=https://your-oauth-provider.com/login
-VITE_APP_ID=your-oauth-app-id
+# ── Supabase (server-side) ────────────────────────────────────────────────────
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_JWT_SECRET=your-jwt-secret-from-supabase-settings
 
-# Owner info
-OWNER_OPEN_ID=your-admin-open-id
-OWNER_NAME=Admin
+# ── Supabase (frontend - VITE_ prefix required) ───────────────────────────────
+VITE_SUPABASE_URL=https://xxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
-# S3 Storage (for file uploads)
-S3_ENDPOINT=https://s3.amazonaws.com
-S3_REGION=us-east-1
-S3_BUCKET=your-bucket-name
-S3_ACCESS_KEY=your-access-key
-S3_SECRET_KEY=your-secret-key
+# ── Auth ──────────────────────────────────────────────────────────────────────
+JWT_SECRET=any-random-64-character-string-here
 
-# AI/LLM Integration (OpenAI-compatible)
-BUILT_IN_FORGE_API_URL=https://api.openai.com/v1
-BUILT_IN_FORGE_API_KEY=sk-your-openai-api-key
-VITE_FRONTEND_FORGE_API_URL=https://api.openai.com/v1
-VITE_FRONTEND_FORGE_API_KEY=sk-your-frontend-key
+# ── LLM (AI lesson generation + recommendations) ──────────────────────────────
+OPENAI_API_KEY=sk-...
+LLM_MODEL=gpt-4o-mini
+# To use Groq instead (free + fast):
+# OPENAI_BASE_URL=https://api.groq.com/openai/v1
+# LLM_MODEL=llama-3.1-8b-instant
+# OPENAI_API_KEY=gsk_...
 
-# App Configuration
+# ── Voice Narration (optional) ────────────────────────────────────────────────
+ELEVENLABS_API_KEY=your-elevenlabs-key
+
+# ── Email (optional) ──────────────────────────────────────────────────────────
+RESEND_API_KEY=re_...
+OWNER_EMAIL=your@email.com
+
+# ── Payments (optional - Tap Payments for MENA) ───────────────────────────────
+TAP_SECRET_KEY=sk_live_...
+TAP_PUBLIC_KEY=pk_live_...
+TAP_WEBHOOK_SECRET=whsec_...
+
+# ── App ───────────────────────────────────────────────────────────────────────
+NODE_ENV=production
+PORT=3000
 VITE_APP_TITLE=MicroLearning Coach
-VITE_APP_LOGO=https://your-cdn.com/logo.svg
 ```
 
-### Authentication Options
+---
 
-The built-in authentication uses Manus OAuth. For self-hosting, you have several options:
+## 3. Deploy on Railway
 
-**Option A: Replace with your own OAuth provider** (recommended for production)
-- Modify `server/_core/oauth.ts` to integrate with your OAuth provider (Auth0, Okta, Keycloak, etc.)
-- Update the callback handler to match your provider's token exchange flow
+### 3a. Create Railway project
+1. Go to https://railway.app → **New Project**
+2. Select **Deploy from GitHub repo**
+3. Choose `Smarthinkerz/microlearning`
+4. Railway auto-detects the `Dockerfile` and `railway.toml`
 
-**Option B: Add local username/password auth**
-- Add a password hash column to the users table
-- Create login/register tRPC procedures
-- Use bcrypt for password hashing
+### 3b. Add environment variables
+Railway → your service → **Variables** tab → paste all variables from Section 2
 
-**Option C: Use an authentication service**
-- Integrate with Clerk, Supabase Auth, or Firebase Auth
-- Replace the session middleware in `server/_core/context.ts`
+### 3c. Add custom domain
+1. Railway → service → **Settings → Networking → Custom Domains**
+2. Click **+ Add Custom Domain** → enter `smarthinkerzmicrolearning.com`
+3. Railway shows a CNAME target like `xxxxxxxx.up.railway.app`
+4. At your DNS provider, add:
+   - `CNAME` `www` → `xxxxxxxx.up.railway.app`
+   - `ALIAS` / `ANAME` `@` → `xxxxxxxx.up.railway.app`
+5. Click **Verify** in Railway — SSL is automatic
 
-## Step 4: Initialize the Database
-
-Run the database migration to create all tables:
-
+### 3d. Run database migrations (first deploy only)
+After first deploy, in Railway → service → **Shell**:
 ```bash
 pnpm db:push
 ```
 
-This will generate and apply all migrations from the Drizzle schema.
+---
 
-## Step 5: Build for Production
+## 4. Deploy on Render
 
-```bash
-pnpm build
-```
+1. Go to https://render.com → **New → Web Service**
+2. Connect `Smarthinkerz/microlearning`
+3. Settings:
+   - **Environment:** Docker
+   - **Dockerfile path:** `Dockerfile`
+   - **Instance type:** Starter ($7/mo) or Free (spins down after 15 min idle)
+4. Add all environment variables from Section 2
+5. Custom domain: Render → service → **Settings → Custom Domains**
 
-This creates:
-- `dist/` - Compiled server bundle
-- `dist/client/` - Built frontend assets (via Vite)
+---
 
-## Step 6: Run in Production
-
-```bash
-NODE_ENV=production node dist/index.js
-```
-
-The server will start on the port defined by the `PORT` environment variable (defaults to 3000).
-
-### Using PM2 (Recommended)
+## 5. Deploy on VPS (Ubuntu/Debian with Docker)
 
 ```bash
-npm install -g pm2
-pm2 start dist/index.js --name microlearning-coach
-pm2 save
-pm2 startup
-```
+# 1. Clone the repo
+git clone https://github.com/Smarthinkerz/microlearning.git
+cd microlearning
 
-### Using Docker
+# 2. Create your .env file
+nano .env   # paste all variables from Section 2
 
-Create a `Dockerfile`:
-
-```dockerfile
-FROM node:20-slim AS builder
-WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
-COPY . .
-RUN pnpm build
-
-FROM node:20-slim
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
-EXPOSE 3000
-ENV NODE_ENV=production
-CMD ["node", "dist/index.js"]
-```
-
-Build and run:
-
-```bash
+# 3. Build and run
 docker build -t microlearning-coach .
-docker run -d -p 3000:3000 --env-file .env microlearning-coach
+docker run -d \
+  --name microlearning \
+  --env-file .env \
+  -p 3000:3000 \
+  --restart unless-stopped \
+  microlearning-coach
+
+# 4. Check it's running
+docker logs microlearning
 ```
 
-### Using Docker Compose
-
+### With Docker Compose
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   app:
     build: .
     ports:
       - "3000:3000"
     env_file: .env
-    depends_on:
-      - db
     restart: unless-stopped
-
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: microlearning_coach
-      MYSQL_USER: mlcoach
-      MYSQL_PASSWORD: securepassword
-    volumes:
-      - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
-
-volumes:
-  mysql_data:
+```
+```bash
+docker compose up -d
 ```
 
-## Step 7: Reverse Proxy (Nginx)
-
+### Nginx reverse proxy (for SSL on VPS)
 ```nginx
 server {
     listen 80;
-    server_name learn.yourdomain.com;
+    server_name smarthinkerzmicrolearning.com www.smarthinkerzmicrolearning.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name learn.yourdomain.com;
+    server_name smarthinkerzmicrolearning.com www.smarthinkerzmicrolearning.com;
 
-    ssl_certificate /etc/ssl/certs/your-cert.pem;
-    ssl_certificate_key /etc/ssl/private/your-key.pem;
+    ssl_certificate /etc/letsencrypt/live/smarthinkerzmicrolearning.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/smarthinkerzmicrolearning.com/privkey.pem;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -217,91 +206,57 @@ server {
     }
 }
 ```
+Get free SSL: `sudo certbot --nginx -d smarthinkerzmicrolearning.com`
 
-## Webhook Integration
+---
 
-The platform supports webhook integration with external workforce management systems.
+## 6. First-Time Setup After Deployment
 
-### Endpoint
+1. **Visit your app URL** — you should see the landing page
+2. **Sign up** at `/login` — create your admin account
+3. **Promote yourself to admin** — run this in Supabase SQL Editor:
+   ```sql
+   UPDATE users SET role = 'admin', app_role = 'admin'
+   WHERE email = 'your@email.com';
+   ```
+4. **Seed the lesson library** — Admin panel → Lesson Library → **Seed Demo Lessons**
+5. **Seed subscription plans** — Admin panel → Subscriptions → **Seed Plans**
 
-```
-POST /api/webhooks/:orgSlug/:type
-Headers: x-webhook-secret: <your-secret>
-```
+---
 
-### Supported Types
+## 7. Tech Stack
 
-| Type | Description | Payload |
-|------|-------------|---------|
-| `shift_sync` | Sync shift schedules | `{ shifts: [{ userId, startTime, endTime, shiftType, location }] }` |
-| `roster_update` | Update team roster | `{ actions: [{ type: "add", userId }] }` |
-| `assignment_trigger` | Trigger lesson assignments | `{ lessonId, userIds: [], priority, dueDate }` |
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, Tailwind CSS 4, shadcn/ui |
+| Backend | Node.js, Express, tRPC 11 |
+| Database | PostgreSQL via Supabase (Drizzle ORM) |
+| Auth | Supabase Auth (email/password) |
+| File Storage | Supabase Storage (`media` bucket) |
+| AI / LLM | OpenAI-compatible API (OpenAI, Groq, Together AI) |
+| Voice | ElevenLabs |
+| Email | Resend |
+| Payments | Tap Payments |
+| Container | Docker multi-stage (node:20-alpine) |
 
-## PWA & Mobile
+---
 
-The application is a Progressive Web App (PWA) and can be installed on mobile devices:
+## 8. Troubleshooting
 
-- **iOS**: Open in Safari, tap Share, then "Add to Home Screen"
-- **Android**: Open in Chrome, tap the install banner or menu "Install app"
-- **Desktop**: Click the install icon in the browser address bar
+**`SSL connection error` on startup**
+Your `DATABASE_URL` is wrong. Use the **Transaction pooler** URI from Supabase (port **6543**), not the direct connection (port 5432).
 
-The PWA includes:
-- Offline caching via service worker
-- Background sync for lesson progress
-- Push notifications for new assignments
-- IndexedDB for offline lesson storage
+**App loads but login fails**
+Make sure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set. The `VITE_` prefix is required for Vite to expose them to the frontend.
 
-## Mobile App (Expo/React Native)
+**`SUPABASE_JWT_SECRET` error**
+Find it in Supabase → Project Settings → API → scroll to **JWT Settings**.
 
-For native iOS and Android apps, the web application can be wrapped using Capacitor or a WebView-based approach. The PWA already provides native-like experience on mobile devices.
+**AI lesson generation fails**
+Set `OPENAI_API_KEY` and `LLM_MODEL`. For free usage, use Groq (console.groq.com).
 
-To create a native wrapper:
+**Voice narration not working**
+Set `ELEVENLABS_API_KEY`. Without it the feature is silently disabled.
 
-```bash
-npx cap init "MicroLearning Coach" com.yourorg.microlearn
-npx cap add ios
-npx cap add android
-pnpm build
-npx cap sync
-npx cap open ios  # Opens in Xcode
-npx cap open android  # Opens in Android Studio
-```
-
-## Database Schema
-
-The platform uses the following core tables:
-
-| Table | Purpose |
-|-------|---------|
-| `users` | User accounts with roles and org membership |
-| `organizations` | Multi-tenant organizations |
-| `shifts` | Worker shift schedules |
-| `lessons` | Micro-learning content |
-| `assignments` | Lesson-to-user assignments |
-| `lessonAttempts` | Progress tracking per attempt |
-| `certificates` | Completion certificates |
-| `notifications` | In-app notifications |
-| `auditLogs` | Compliance audit trail |
-| `webhookConfigs` | External system integrations |
-
-## Troubleshooting
-
-**Database connection fails**: Ensure your MySQL server is running and the `DATABASE_URL` is correct. Check that the database exists and the user has proper permissions.
-
-**Build fails**: Run `pnpm install` again and ensure Node.js 20+ is installed. Check for TypeScript errors with `npx tsc --noEmit`.
-
-**Auth not working**: Verify all OAuth environment variables are set correctly. For self-hosted auth, ensure the callback URL matches your domain.
-
-**S3 uploads fail**: Verify S3 credentials and bucket permissions. The bucket should allow public read access for lesson media.
-
-## Support
-
-For issues with the self-hosted deployment, check the server logs:
-
-```bash
-# PM2 logs
-pm2 logs microlearning-coach
-
-# Docker logs
-docker logs microlearning-coach
-```
+**Docker build fails on pnpm**
+The Dockerfile uses `npm install -g pnpm@10.4.1 --force`. If this fails on your host, change the base image from `node:20-alpine` to `node:20` (Debian-based) in the Dockerfile.
