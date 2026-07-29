@@ -127,11 +127,12 @@ export default function Pricing() {
   const consumerPlans = plans?.filter(p => ["consumer_free", "consumer_premium"].includes(p.tier)) || [];
 
   const handleSubscribe = (slug: string) => {
+    const cycle = annual ? "yearly" : "monthly";
     if (!isAuthenticated) {
-      toast.info("Please sign in to subscribe");
+      // Send unauthenticated users to registration with plan pre-selected
+      window.location.href = `/register?plan=${slug}&cycle=${cycle}`;
       return;
     }
-    const cycle = annual ? "yearly" : "monthly";
     checkoutMutation.mutate({
       planSlug: slug,
       cycle,
