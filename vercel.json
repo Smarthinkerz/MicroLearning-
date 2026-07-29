@@ -14,8 +14,12 @@
       "destination": "/api/server"
     },
     {
-      "source": "/checkout/(.*)",
+      "source": "/checkout/return(.*)",
       "destination": "/api/server"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
