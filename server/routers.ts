@@ -1302,80 +1302,60 @@ const subscriptionRouter = router({
     return { success: true, message: "Subscription created with 14-day trial" };
   }),
 
-  // Tap Payment Gateway: Create a checkout session
+  // Tap Payment Gateway: Create a checkout session (direct Tap API)
   createCheckout: protectedProcedure.input(z.object({
     planSlug: z.string(),
     cycle: z.enum(["monthly", "yearly"]).optional(),
     quantity: z.number().min(1).default(1),
     origin: z.string(),
   })).mutation(async ({ ctx, input }) => {
+    const { buildSubscriptionCharge, createCharge } = await import("./tapPayment");
     const plan = await db.getPlanBySlug(input.planSlug);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-    
+
     let orgId = ctx.user.orgId;
     if (!orgId) {
       const orgs = await db.getAllOrganizations();
       orgId = orgs[0]?.id || 1;
     }
-    
-    // Parse customer name into firstName and lastName
+
     const nameParts = (ctx.user.name || "Customer").split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ") || "";
     const customerEmail = ctx.user.email || "customer@example.com";
-    
-    // Generate external reference for reconciliation
-    const externalRef = `user_${ctx.user.id}_${Date.now()}`;
-    
-    // Build form data according to Smarthinkerz API spec
-    const formData = new URLSearchParams();
-    formData.append("plan", input.planSlug);
-    formData.append("cycle", input.cycle || "monthly");
-    formData.append("firstName", firstName);
-    if (lastName) formData.append("lastName", lastName);
-    formData.append("email", customerEmail);
-    formData.append("external_ref", externalRef);
-    formData.append("return_url", `${input.origin}/payment-callback`);
-    
+    const cycle = input.cycle || "monthly";
+    const amount = cycle === "yearly" ? (plan.priceYearly ?? plan.priceMonthly * 10) : plan.priceMonthly;
+    const redirectUrl = `${input.origin}/checkout/return`;
+    const webhookUrl = `${input.origin}/api/tap/webhook`;
+
     try {
-      const response = await fetch("https://smarhinkerz.com/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
-        redirect: "manual",
+      const chargeRequest = buildSubscriptionCharge({
+        planName: plan.name,
+        amount,
+        currency: plan.currency || "USD",
+        customerEmail,
+        customerName: [firstName, lastName].filter(Boolean).join(" "),
+        orgId,
+        planId: plan.id,
+        redirectUrl,
+        webhookUrl,
       });
-      
-      if (response.status === 303 || response.status === 302) {
-        const checkoutUrl = response.headers.get("Location");
-        if (!checkoutUrl) throw new Error("No checkout URL in redirect");
-        
-        const amount = (plan.priceMonthly / 100) * input.quantity;
-        await db.createPayment({
-          orgId,
-          amount: Math.round(amount * 100),
-          currency: plan.currency || "USD",
-          status: "pending",
-          paymentMethod: "tap",
-          externalChargeId: `smarthinkerz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          description: `${plan.name} Plan - ${input.quantity} seat(s)`,
-          metadata: { planSlug: input.planSlug, quantity: input.quantity, cycle: input.cycle || "monthly" },
-        });
-        
-        return { success: true, redirectUrl: checkoutUrl };
+      const charge = await createCharge(chargeRequest);
+      if (!charge?.transaction?.url) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Tap did not return a checkout URL" });
       }
-      
-      if (response.status === 400) {
-        const error = await response.json();
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error.error || "Invalid checkout parameters",
-        });
-      }
-      
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `Smarthinkerz returned status ${response.status}`,
+      // Persist payment record for reconciliation
+      await db.createPayment({
+        orgId,
+        amount: Math.round(amount * 100),
+        currency: plan.currency || "USD",
+        status: "pending",
+        paymentMethod: "tap",
+        externalChargeId: charge.id,
+        description: `${plan.name} Plan (${cycle})`,
+        metadata: { planSlug: input.planSlug, cycle, quantity: input.quantity, tapChargeId: charge.id },
       });
+      return { success: true, redirectUrl: charge.transaction.url };
     } catch (err) {
       if (err instanceof TRPCError) throw err;
       throw new TRPCError({

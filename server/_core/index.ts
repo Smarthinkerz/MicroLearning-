@@ -10,6 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { autoSeedLessons, autoSeedPlans } from "../autoSeed";
 import { generalLimiter, trpcRateLimiter } from "../middleware/rateLimiter";
 import { tapWebhookRouter } from "../webhooks/tapWebhook";
+import { checkoutRouter } from "../checkout";
 import helmet from "helmet";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -75,6 +76,10 @@ async function startServer() {
 
   // Tap payment webhook (before tRPC, needs raw body access)
   app.use("/api/webhooks", tapWebhookRouter);
+
+  // Tap Payments: checkout POST, return GET, webhook POST, refund POST
+  app.use("/api", checkoutRouter);
+  app.use("/", checkoutRouter);
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);

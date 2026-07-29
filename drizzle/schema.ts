@@ -755,3 +755,62 @@ export type ABTestAssignment = typeof abTestAssignments.$inferSelect;
 export type InsertABTestAssignment = typeof abTestAssignments.$inferInsert;
 export type ABTestMetric = typeof abTestMetrics.$inferSelect;
 export type InsertABTestMetric = typeof abTestMetrics.$inferInsert;
+
+// ─── Tap Payments: Orders ────────────────────────────────────────────────────
+export const orderStatusEnum = pgEnum("order_status", [
+  "initiated",
+  "paid",
+  "failed",
+  "cancelled",
+  "refunded",
+  "partially_refunded",
+  "refunding",
+]);
+
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  tapChargeId: varchar("tap_charge_id", { length: 255 }).unique(),
+  referenceTransaction: varchar("reference_transaction", { length: 255 }).notNull(),
+  referenceOrder: varchar("reference_order", { length: 255 }).notNull(),
+  planSlug: varchar("plan_slug", { length: 128 }).notNull(),
+  planName: varchar("plan_name", { length: 255 }).notNull(),
+  product: varchar("product", { length: 255 }).notNull(),
+  cycle: varchar("cycle", { length: 32 }),
+  amount: integer("amount").notNull(),
+  currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+  customerFirstName: varchar("customer_first_name", { length: 128 }).notNull(),
+  customerLastName: varchar("customer_last_name", { length: 128 }),
+  customerEmail: varchar("customer_email", { length: 255 }).notNull(),
+  customerPhone: varchar("customer_phone", { length: 32 }),
+  customerPhoneCountryCode: varchar("customer_phone_country_code", { length: 8 }),
+  status: orderStatusEnum("status").default("initiated").notNull(),
+  failureMessage: text("failure_message"),
+  paidAt: bigint("paid_at", { mode: "number" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  tapResponseCode: varchar("tap_response_code", { length: 32 }),
+  tapResponseMessage: text("tap_response_message"),
+  receiptSent: boolean("receipt_sent").default(false).notNull(),
+});
+
+// ─── Tap Payments: Webhook Idempotency ───────────────────────────────────────
+export const processedWebhookEvents = pgTable("processed_webhook_events", {
+  id: serial("id").primaryKey(),
+  eventKey: varchar("event_key", { length: 512 }).notNull().unique(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
+// ─── Tap Payments: Webhook Audit Log ─────────────────────────────────────────
+export const webhookAuditEvents = pgTable("webhook_audit_events", {
+  id: serial("id").primaryKey(),
+  chargeId: varchar("charge_id", { length: 255 }),
+  rawStatus: varchar("raw_status", { length: 64 }),
+  result: varchar("result", { length: 64 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = typeof orders.$inferInsert;
+export type ProcessedWebhookEvent = typeof processedWebhookEvents.$inferSelect;
+export type WebhookAuditEvent = typeof webhookAuditEvents.$inferSelect;
