@@ -4,6 +4,9 @@ export const ENV = {
   databaseUrl: process.env.DATABASE_URL ?? "",
   isProduction: process.env.NODE_ENV === "production",
   nodeEnv: process.env.NODE_ENV ?? "development",
+  // Public URL of the deployed app — used for Tap payment redirects and webhook URLs.
+  // Set APP_URL in your hosting env (e.g. https://smarthinkerzmicrolearning.com).
+  appUrl: (process.env.APP_URL ?? "").replace(/\/$/, ""),
 
   // Supabase (auth + storage + database)
   supabaseUrl: process.env.SUPABASE_URL ?? "",

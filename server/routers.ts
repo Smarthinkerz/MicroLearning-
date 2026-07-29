@@ -6,6 +6,7 @@ import * as db from "./db";
 import { invokeLLM } from "./_core/llm";
 import { SEED_LESSONS } from "./seedLessons";
 import { offlineSyncRouter } from "./routers/offlineSync";
+import { ENV } from "./_core/env";
 import { enforceFeatureAccess } from "./middleware/tierGating";
 import { pushRouter } from "./routers/pushNotification";
 import { aiRecommendationRouter } from "./routers/aiRecommendation";
@@ -1325,8 +1326,11 @@ const subscriptionRouter = router({
     const customerEmail = ctx.user.email || "customer@example.com";
     const cycle = input.cycle || "monthly";
     const amount = cycle === "yearly" ? (plan.priceYearly ?? plan.priceMonthly * 10) : plan.priceMonthly;
-    const redirectUrl = `${input.origin}/checkout/return`;
-    const webhookUrl = `${input.origin}/api/tap/webhook`;
+    // Use the server-side APP_URL env var as the authoritative base URL for Tap redirects.
+    // This prevents the Manus preview domain from leaking into payment callbacks.
+    const baseUrl = ENV.appUrl || input.origin;
+    const redirectUrl = `${baseUrl}/checkout/return`;
+    const webhookUrl = `${baseUrl}/api/tap/webhook`;
 
     try {
       const chargeRequest = buildSubscriptionCharge({
