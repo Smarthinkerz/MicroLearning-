@@ -512,3 +512,60 @@ CREATE TABLE "webhook_configs" (
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('media', 'media', true)
 ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================================
+-- Tap Payments: Orders, Webhook Idempotency, Webhook Audit Log
+-- Added to support the full Tap Payments integration spec
+-- =============================================================================
+
+CREATE TYPE "public"."order_status" AS ENUM(
+  'initiated', 'paid', 'failed', 'cancelled', 'refunded', 'partially_refunded', 'refunding'
+);
+
+CREATE TABLE IF NOT EXISTS "orders" (
+  "id" serial PRIMARY KEY NOT NULL,
+  "tap_charge_id" varchar(255) UNIQUE,
+  "reference_transaction" varchar(255) NOT NULL,
+  "reference_order" varchar(255) NOT NULL,
+  "plan_slug" varchar(128) NOT NULL,
+  "plan_name" varchar(255) NOT NULL,
+  "product" varchar(255) NOT NULL,
+  "cycle" varchar(32),
+  "amount" integer NOT NULL,
+  "currency" varchar(3) DEFAULT 'USD' NOT NULL,
+  "customer_first_name" varchar(128) NOT NULL,
+  "customer_last_name" varchar(128),
+  "customer_email" varchar(255) NOT NULL,
+  "customer_phone" varchar(32),
+  "customer_phone_country_code" varchar(8),
+  "status" "order_status" DEFAULT 'initiated' NOT NULL,
+  "failure_message" text,
+  "paid_at" bigint,
+  "created_at" timestamp DEFAULT now() NOT NULL,
+  "updated_at" timestamp DEFAULT now() NOT NULL,
+  "tap_response_code" varchar(32),
+  "tap_response_message" text,
+  "receipt_sent" boolean DEFAULT false NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "processed_webhook_events" (
+  "id" serial PRIMARY KEY NOT NULL,
+  "event_key" varchar(512) NOT NULL UNIQUE,
+  "processed_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "webhook_audit_events" (
+  "id" serial PRIMARY KEY NOT NULL,
+  "charge_id" varchar(255),
+  "raw_status" varchar(64),
+  "result" varchar(64) NOT NULL,
+  "ip_address" varchar(64),
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+-- Indexes for Tap Payments tables
+CREATE INDEX IF NOT EXISTS "orders_tap_charge_id_idx" ON "orders" ("tap_charge_id");
+CREATE INDEX IF NOT EXISTS "orders_customer_email_idx" ON "orders" ("customer_email");
+CREATE INDEX IF NOT EXISTS "orders_status_idx" ON "orders" ("status");
+CREATE INDEX IF NOT EXISTS "processed_webhook_events_event_key_idx" ON "processed_webhook_events" ("event_key");
+CREATE INDEX IF NOT EXISTS "webhook_audit_events_charge_id_idx" ON "webhook_audit_events" ("charge_id");
