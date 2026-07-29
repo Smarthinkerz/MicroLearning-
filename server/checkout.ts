@@ -163,7 +163,9 @@ checkoutRouter.post("/checkout", async (req: Request, res: Response) => {
     const rand = Math.random().toString(36).substring(2, 8);
     const refTxn = `txn_${planSlug}_${cycle || "once"}_${ts}`;
     const refOrder = `ord_${ts}_${rand}`;
-    const appOrigin = origin || (req.headers.origin as string) || "https://smarthinkerzmicrolearning.com";
+    // ENV.appUrl is always authoritative (set APP_URL in hosting env).
+    // Never trust the client-supplied origin for payment redirect URLs.
+    const appOrigin = ENV.appUrl || `${req.protocol}://${req.get("host")}`;
     const redirectUrl = `${appOrigin}/checkout/return`;
     const webhookUrl = `${appOrigin}/api/tap/webhook`;
 

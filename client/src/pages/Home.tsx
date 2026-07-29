@@ -194,7 +194,7 @@ export default function Home() {
             ) : (
               <>
                 <Button variant="ghost" size="sm" onClick={() => setLocation("/login")}>Sign in</Button>
-                <Button size="sm" onClick={() => setLocation("/login")}>
+                <Button size="sm" onClick={() => setLocation("/register")}>
                   Start Free Trial <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </>
@@ -246,7 +246,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     className="flex-1 text-base min-h-[52px] gap-2"
-                    onClick={() => setLocation("/login")}
+                    onClick={() => setLocation("/register")}
                     aria-label="Start free trial for individual learners"
                   >
                     <User className="h-4 w-4" />
@@ -469,7 +469,7 @@ export default function Home() {
               Free forever for up to 5 learners. No credit card required.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button size="lg" className="text-base px-8" onClick={() => setLocation("/login")}>
+              <Button size="lg" className="text-base px-8" onClick={() => setLocation("/register")}>
                 Get Started — It's Free
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
