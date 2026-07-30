@@ -51,11 +51,17 @@ export async function getDb() {
       return null;
     }
     try {
-      _pool = new Pool({
+      // Let the connection string control SSL via ?sslmode= parameter
+      // Do not pass ssl option here as it overrides the connection string's sslmode
+      const poolConfig: any = {
         connectionString: dbUrl,
-        ssl: { rejectUnauthorized: false, checkServerIdentity: () => undefined },
         connectionTimeoutMillis: 10000,
-      });
+      };
+      // Only add ssl config if sslmode=require is in the URL
+      if (dbUrl.includes('sslmode=require')) {
+        poolConfig.ssl = { rejectUnauthorized: false, checkServerIdentity: () => undefined };
+      }
+      _pool = new Pool(poolConfig);
       _db = drizzle(_pool);
       // Verify connection works on first use
       await _pool.query("SELECT 1");
