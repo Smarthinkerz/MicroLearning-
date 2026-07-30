@@ -9,7 +9,7 @@
  */
 
 import { ForbiddenError } from "@shared/_core/errors";
-import { jwtVerify } from "jose";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 import type { Request } from "express";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
@@ -33,15 +33,27 @@ export type SupabaseJwtPayload = {
   iat: number;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────
+// ─── JWKS Setup ───────────────────────────────────────────────────────
+const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
+let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
-function getJwtSecret(): Uint8Array {
-  const secret = ENV.supabaseJwtSecret ?? ENV.cookieSecret;
-  if (!secret) {
-    throw new Error("[Auth] SUPABASE_JWT_SECRET is not configured");
+function getJwks() {
+  if (!_jwks && SUPABASE_URL) {
+    _jwks = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
   }
-  return new TextEncoder().encode(secret);
+  return _jwks;
 }
+
+function getAlgorithmFromToken(token: string): string {
+  try {
+    const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString());
+    return header.alg ?? 'HS256';
+  } catch {
+    return 'HS256';
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────
 
 function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
@@ -59,18 +71,42 @@ function extractBearerToken(req: Request): string | null {
 class SDKServer {
   /**
    * Verify a Supabase JWT and return the payload.
+   * Supports both ES256 (new asymmetric keys) and HS256 (legacy secret).
    */
   async verifySupabaseJwt(token: string): Promise<SupabaseJwtPayload | null> {
-    try {
-      const secret = getJwtSecret();
-      const { payload } = await jwtVerify(token, secret, {
-        algorithms: ["HS256"],
-      });
-      return payload as unknown as SupabaseJwtPayload;
-    } catch (error) {
-      console.warn("[Auth] JWT verification failed:", String(error));
-      return null;
+    const alg = getAlgorithmFromToken(token);
+
+    // Try ES256 via JWKS first (new Supabase default)
+    if (alg === 'ES256') {
+      const jwks = getJwks();
+      if (jwks) {
+        try {
+          const { payload } = await jwtVerify(token, jwks, {
+            algorithms: ["ES256"],
+          });
+          return payload as unknown as SupabaseJwtPayload;
+        } catch (error) {
+          console.warn("[Auth] ES256 JWKS verification failed:", String(error));
+        }
+      }
     }
+
+    // Fallback: try HS256 with Legacy JWT Secret
+    const legacySecret = ENV.supabaseJwtSecret ?? ENV.cookieSecret;
+    if (legacySecret) {
+      try {
+        const secretKey = new TextEncoder().encode(legacySecret);
+        const { payload } = await jwtVerify(token, secretKey, {
+          algorithms: ["HS256"],
+        });
+        return payload as unknown as SupabaseJwtPayload;
+      } catch (error) {
+        console.warn("[Auth] HS256 legacy verification failed:", String(error));
+      }
+    }
+
+    console.warn("[Auth] JWT verification failed for alg:", alg);
+    return null;
   }
 
   /**
