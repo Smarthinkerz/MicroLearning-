@@ -106,6 +106,39 @@ export function createApp() {
     }
   });
 
+  // Auth debug endpoint (temporary - remove after login is fixed)
+  app.get("/api/debug-auth", async (req, res) => {
+    const authHeader = req.headers.authorization ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.json({ error: 'No token provided' });
+    try {
+      // Decode header
+      const headerB64 = token.split('.')[0];
+      const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+      // Test JWKS fetch
+      const supabaseUrl = process.env.SUPABASE_URL ?? '';
+      const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+      let jwksResult: any = null;
+      let jwksError: string | null = null;
+      try {
+        const resp = await fetch(jwksUrl);
+        jwksResult = await resp.json();
+      } catch (e: any) { jwksError = String(e.message); }
+      // Try verification
+      const { jwtVerify, createRemoteJWKSet } = await import('jose');
+      let verifyResult: any = null;
+      let verifyError: string | null = null;
+      try {
+        const jwks = createRemoteJWKSet(new URL(jwksUrl));
+        const { payload } = await jwtVerify(token, jwks, { algorithms: ['ES256'] });
+        verifyResult = { sub: (payload as any).sub, email: (payload as any).email };
+      } catch (e: any) { verifyError = String(e.message); }
+      res.json({ header, supabaseUrl, jwksUrl, jwksKeys: jwksResult?.keys?.length ?? 0, jwksError, verifyResult, verifyError });
+    } catch (e: any) {
+      res.json({ error: String(e.message) });
+    }
+  });
+
   // Tap payment webhook (before tRPC, needs raw body access)
   app.use("/api/webhooks", tapWebhookRouter);
 
