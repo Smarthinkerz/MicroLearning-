@@ -34,12 +34,19 @@ export type SupabaseJwtPayload = {
 };
 
 // ─── JWKS Setup ───────────────────────────────────────────────────────
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
+// NOTE: Do NOT read process.env at module level — esbuild may inline an
+// empty string at build time. Instead, read lazily inside the function.
 let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+let _jwksUrl: string | null = null;
 
 function getJwks() {
-  if (!_jwks && SUPABASE_URL) {
-    _jwks = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
+  const supabaseUrl = process.env.SUPABASE_URL ?? "";
+  if (!supabaseUrl) return null;
+  const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+  // Re-create the JWKS set if the URL has changed (env hot-reload)
+  if (!_jwks || _jwksUrl !== jwksUrl) {
+    _jwks = createRemoteJWKSet(new URL(jwksUrl));
+    _jwksUrl = jwksUrl;
   }
   return _jwks;
 }
