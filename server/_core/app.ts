@@ -87,6 +87,25 @@ export function createApp() {
     res.json({ status: "ok", timestamp: Date.now() });
   });
 
+  // DB debug endpoint (temporary)
+  app.get("/api/debug-db", async (_req, res) => {
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) return res.json({ error: "DATABASE_URL not set", env: process.env.NODE_ENV });
+    try {
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        connectionString: dbUrl,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 8000,
+      });
+      const result = await pool.query("SELECT current_database(), version()");
+      await pool.end();
+      res.json({ ok: true, db: result.rows[0], urlHost: dbUrl.split("@")[1]?.split("/")[0] });
+    } catch (err: any) {
+      res.json({ error: String(err.message), code: err.code, urlHost: dbUrl.split("@")[1]?.split("/")[0] });
+    }
+  });
+
   // Tap payment webhook (before tRPC, needs raw body access)
   app.use("/api/webhooks", tapWebhookRouter);
 
