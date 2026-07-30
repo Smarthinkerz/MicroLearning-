@@ -95,7 +95,7 @@ export function createApp() {
       const { Pool } = await import("pg");
       const pool = new Pool({
         connectionString: dbUrl,
-        ssl: { rejectUnauthorized: false },
+        ssl: { rejectUnauthorized: false, checkServerIdentity: () => undefined },
         connectionTimeoutMillis: 8000,
       });
       const result = await pool.query("SELECT current_database(), version()");
