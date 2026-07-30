@@ -15,8 +15,13 @@ export async function createContext(
 
   try {
     user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
+  } catch (error: any) {
     // Authentication is optional for public procedures.
+    // Log non-trivial errors (not just "missing token" which is expected for public routes)
+    const msg = error?.message ?? String(error);
+    if (!msg.includes('Missing authentication token') && !msg.includes('Missing session cookie')) {
+      console.error('[Auth] authenticateRequest error:', msg, error?.cause ? String(error.cause) : '');
+    }
     user = null;
   }
 
