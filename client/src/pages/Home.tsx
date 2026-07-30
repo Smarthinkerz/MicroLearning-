@@ -1,6 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
+import { trpc } from "@/lib/trpc";
 
 import {
   Clock,
@@ -30,6 +32,9 @@ import {
   Moon,
   Building2,
   User,
+  Crown,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -130,12 +135,31 @@ const TRUST_ITEMS = [
   { icon: HeartHandshake, label: "99.9% Uptime SLA" },
 ];
 
+function formatPrice(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+const PLAN_FEATURES: Record<string, string[]> = {
+  starter: ["Up to 30 lessons", "Offline access", "Basic progress tracking", "Gamification & badges", "Push notifications", "AI Voice Narration", "Email support"],
+  pro: ["Unlimited lessons", "Full analytics dashboard", "AI-powered recommendations", "Content authoring studio", "SCORM/xAPI export", "Cohort management", "Priority support"],
+  enterprise: ["Everything in Pro", "SSO integration", "HRIS integration", "White-label branding", "Custom onboarding", "Dedicated account manager", "SLA guarantee"],
+};
+
+const PLAN_ICONS: Record<string, React.ReactNode> = {
+  starter: <Zap className="h-6 w-6 text-blue-400" />,
+  pro: <Star className="h-6 w-6 text-purple-400" />,
+  enterprise: <Crown className="h-6 w-6 text-amber-400" />,
+};
+
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [annual, setAnnual] = useState(false);
+  const { data: plans, isLoading: plansLoading } = trpc.subscription.getPlans.useQuery();
+  const employerPlans = plans?.filter(p => ["starter", "pro", "enterprise"].includes(p.tier)) || [];
   const mainVideoRef = useRef<HTMLVideoElement>(null);
   const { theme, toggleTheme } = useTheme();
 
@@ -168,7 +192,7 @@ export default function Home() {
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-fast">Features</button>
             <button onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-fast">How It Works</button>
-            <button onClick={() => setLocation("/pricing")} className="hover:text-foreground transition-fast">Pricing</button>
+            <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-fast">Pricing</button>
             <button onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-fast">FAQ</button>
           </div>
           <div className="flex items-center gap-3">
@@ -406,6 +430,126 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ── */}
+      <section id="pricing" className="py-20 px-4 bg-secondary/30">
+        <div className="container">
+          <div className="text-center mb-12">
+            <Badge variant="secondary" className="mb-4">
+              <Sparkles className="h-3 w-3 mr-1" /> Simple, Transparent Pricing
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Plans for Every{" "}
+              <span className="bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">Team Size</span>
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+              Start free, scale as you grow. All plans include a 14-day free trial.
+            </p>
+            {/* Billing toggle */}
+            <div className="flex items-center justify-center gap-3">
+              <span className={`text-sm font-medium ${!annual ? "text-foreground" : "text-muted-foreground"}`}>Monthly</span>
+              <button
+                role="switch"
+                aria-checked={annual}
+                onClick={() => setAnnual(!annual)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  annual ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${annual ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+              <span className={`text-sm font-medium ${annual ? "text-foreground" : "text-muted-foreground"}`}>Annual</span>
+              {annual && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Save ~17%</span>
+              )}
+            </div>
+          </div>
+
+          {plansLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="glass-card rounded-2xl h-[480px] animate-pulse bg-muted/20" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {employerPlans.map((plan) => {
+                const isPro = plan.tier === "pro";
+                const price = annual && plan.priceYearly
+                  ? Math.round(plan.priceYearly / 12)
+                  : plan.priceMonthly;
+                const features = PLAN_FEATURES[plan.tier] || [];
+
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative glass-card rounded-2xl p-6 flex flex-col transition-all duration-300 ${
+                      isPro
+                        ? "border-purple-500/40 ring-2 ring-purple-500/20 scale-[1.02]"
+                        : "hover:border-primary/30"
+                    }`}
+                  >
+                    {isPro && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span className="bg-purple-500 text-white text-xs font-semibold px-4 py-1 rounded-full">
+                          Most Popular
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 mb-4">
+                      {PLAN_ICONS[plan.tier]}
+                      <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
+                    </div>
+
+                    <div className="mb-6">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-extrabold tabular-nums text-foreground">{formatPrice(price)}</span>
+                        <span className="text-muted-foreground text-sm">/user/mo</span>
+                      </div>
+                      {annual && plan.priceYearly && (
+                        <p className="text-xs text-muted-foreground mt-1">{formatPrice(plan.priceYearly)} billed annually</p>
+                      )}
+                    </div>
+
+                    <ul className="space-y-2.5 flex-1 mb-6">
+                      {features.map((feat) => (
+                        <li key={feat} className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      className="w-full"
+                      variant={isPro ? "default" : "outline"}
+                      size="lg"
+                      onClick={() =>
+                        plan.tier === "enterprise"
+                          ? setLocation("/pricing")
+                          : setLocation(`/register?plan=${plan.slug}&cycle=${annual ? "yearly" : "monthly"}`)
+                      }
+                    >
+                      {plan.tier === "enterprise" ? "Contact Sales" : "Start 14-Day Trial"}
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="text-center mt-10">
+            <button
+              onClick={() => setLocation("/pricing")}
+              className="text-sm text-primary hover:underline inline-flex items-center gap-1 font-medium"
+            >
+              See full feature comparison <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </section>
