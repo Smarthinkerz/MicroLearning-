@@ -44,16 +44,26 @@ let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db) {
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      console.error("[Database] DATABASE_URL is not set in environment. NODE_ENV=", process.env.NODE_ENV);
+      return null;
+    }
     try {
       _pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: dbUrl,
         ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+        connectionTimeoutMillis: 10000,
       });
       _db = drizzle(_pool);
+      // Verify connection works on first use
+      await _pool.query("SELECT 1");
+      console.log("[Database] Connected successfully to", dbUrl.split("@")[1]?.split("/")[0] ?? "db");
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Failed to connect:", String(error));
       _db = null;
+      _pool = null;
     }
   }
   return _db;
