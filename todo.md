@@ -17,6 +17,10 @@
 - [x] Multi-tenant organization support
 - [x] Organization membership management
 - [x] Admin user promotion flow
+- [x] Configure fathi.alriyami@smarthinkerz.com as the platform super-admin
+- [x] Configure fathi.alriyami1@gmail.com as a standard learner without admin access
+- [x] Verify both accounts can authenticate and enforce the requested role boundary
+- [x] Validate the Supabase service-role secret through a lightweight Auth Admin integration test
 
 ## Shift Management
 - [x] Shift CRUD operations
