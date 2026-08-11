@@ -1077,3 +1077,4 @@ All strategic features have been added to the database schema and subscription p
 - [x] Update server auth router logout to stateless no-op (Supabase handles client-side)
 - [x] Update all test files to use supabaseId instead of openId user shape
 - [x] Fix auth.logout.test.ts and features.test.ts for new stateless logout
+- [x] Restore preloaded lesson visibility on the live dashboard at smarthinkerzmicrolearning.com
