@@ -1081,6 +1081,7 @@ All strategic features have been added to the database schema and subscription p
 - [ ] Restore live AI lesson generation after the reported provider failure
 - [ ] Verify smarthinkerzmicrolearning.com routes to the Vercel production deployment before applying the AI fix
 - [ ] Replace the ElevenLabs key identifier with the corresponding secret TTS API key in the Vercel production configuration
+- [ ] Verify that the current Vercel production deployment receives the updated ElevenLabs secret after redeployment
 - [ ] Fix newly saved shifts not appearing on the My Shifts screen
 - [ ] Fix the Analytics page React hook-order error
 - [ ] Correct the system-check AI/LLM status to inspect the actual Vercel LLM credential configuration
