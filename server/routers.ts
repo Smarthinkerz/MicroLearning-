@@ -1602,8 +1602,9 @@ const voiceRouter = router({
         if (plan?.features) userFeatures = plan.features as any;
       }
     }
-    // Admin users bypass the check
-    if (ctx.user.role !== "admin" && !hasFeature(userFeatures, "voiceNarration")) {
+    // Platform and organization administrators bypass the plan-level feature check.
+    const hasAdminNarrationAccess = ["employer_admin", "super_admin"].includes(ctx.user.appRole) || ctx.user.role === "admin";
+    if (!hasAdminNarrationAccess && !hasFeature(userFeatures, "voiceNarration")) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "AI voice narration is available on Pro, Premium, and Enterprise plans. Please upgrade to access this feature.",
@@ -1678,8 +1679,9 @@ const voiceRouter = router({
         if (plan?.features) userFeatures = plan.features as any;
       }
     }
-    // Admin users bypass the check
-    if (ctx.user.role !== "admin" && !hasFeature(userFeatures, "voiceNarration")) {
+    // Platform and organization administrators bypass the plan-level feature check.
+    const hasAdminNarrationAccess = ["employer_admin", "super_admin"].includes(ctx.user.appRole) || ctx.user.role === "admin";
+    if (!hasAdminNarrationAccess && !hasFeature(userFeatures, "voiceNarration")) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "AI voice narration is available on Pro, Premium, and Enterprise plans. Please upgrade to access this feature.",

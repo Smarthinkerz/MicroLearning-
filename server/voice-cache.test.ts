@@ -49,6 +49,29 @@ function createUserContext(): TrpcContext {
   };
 }
 
+function createSuperAdminContext(): TrpcContext {
+  return {
+    user: {
+      id: 3,
+      supabaseId: "platform-super-admin",
+      email: "superadmin@example.com",
+      name: "Platform Super Admin",
+      role: "user",
+      appRole: "super_admin",
+      orgId: 1,
+      timezone: "UTC",
+      avatarUrl: null,
+      notificationPreferences: null,
+      lastActiveAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    } as any,
+    req: { protocol: "https", headers: {} } as any,
+    res: { clearCookie: () => {} } as any,
+  };
+}
+
 describe("Voice Audio Cache", () => {
   describe("computeVoiceCacheKey", () => {
     it("produces a deterministic SHA-256 hash", () => {
@@ -174,6 +197,21 @@ describe("Voice Audio Cache", () => {
         });
       } catch (err: any) {
         // Should NOT be FORBIDDEN — any other error is acceptable (e.g., ElevenLabs rate limit)
+        expect(err.code).not.toBe("FORBIDDEN");
+      }
+    }, 15000);
+
+    it("synthesize allows application super-admins regardless of their base user role", async () => {
+      const caller = appRouter.createCaller(createSuperAdminContext());
+      try {
+        await caller.voice.synthesize({
+          text: "Platform administrator narration test",
+          voiceId: "EXAVITQu4vr4xnSDxMaL",
+          stability: 0.5,
+          similarityBoost: 0.75,
+          skipCache: true,
+        });
+      } catch (err: any) {
         expect(err.code).not.toBe("FORBIDDEN");
       }
     }, 15000);
