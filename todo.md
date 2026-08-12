@@ -1088,3 +1088,4 @@ All strategic features have been added to the database schema and subscription p
 - [x] Verify the Vercel-served My Shifts page renders the saved shift card rather than persistent skeletons
 - [x] Fix the Analytics page React hook-order error
 - [x] Correct the system-check AI/LLM status to inspect the actual Vercel LLM credential configuration
+- [ ] Fix browser audio playback for successfully generated ElevenLabs narration files

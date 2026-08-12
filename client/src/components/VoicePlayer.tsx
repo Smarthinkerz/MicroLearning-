@@ -9,6 +9,7 @@ import { Volume2, VolumeX, Play, Pause, Loader2, Settings2, Mic, Lock, Zap, Refr
 import { toast } from "sonner";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { Link } from "wouter";
+import { getAudioPlaybackMessage } from "@/lib/audioPlayback";
 
 interface VoicePlayerProps {
   /** Text to synthesize */
@@ -68,17 +69,34 @@ export function VoicePlayer({ text, lessonId, compact }: VoicePlayerProps) {
   useEffect(() => {
     if (!audioUrl) return;
     const audio = new Audio(audioUrl);
+    let disposed = false;
     audioRef.current = audio;
     audio.volume = volume;
 
-    audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
-    audio.addEventListener("timeupdate", () => setProgress(audio.currentTime));
-    audio.addEventListener("ended", () => { setIsPlaying(false); setProgress(0); });
-    audio.addEventListener("error", () => toast.error("Audio playback error"));
+    const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleTimeUpdate = () => setProgress(audio.currentTime);
+    const handleEnded = () => { setIsPlaying(false); setProgress(0); };
+    const handleError = () => {
+      if (disposed) return;
+      setIsPlaying(false);
+      toast.error(getAudioPlaybackMessage(audio.error?.code));
+    };
+
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
 
     return () => {
+      disposed = true;
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
       audio.pause();
-      audio.src = "";
+      audio.removeAttribute("src");
+      audio.load();
+      if (audioRef.current === audio) audioRef.current = null;
     };
   }, [audioUrl]);
 
@@ -121,10 +139,16 @@ export function VoicePlayer({ text, lessonId, compact }: VoicePlayerProps) {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      void audioRef.current.play().then(
+        () => setIsPlaying(true),
+        () => {
+          setIsPlaying(false);
+          toast.error("Audio could not start. Please try again.");
+        },
+      );
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (value: number[]) => {
