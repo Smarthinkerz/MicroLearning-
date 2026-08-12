@@ -1078,13 +1078,13 @@ All strategic features have been added to the database schema and subscription p
 - [x] Update all test files to use supabaseId instead of openId user shape
 - [x] Fix auth.logout.test.ts and features.test.ts for new stateless logout
 - [x] Restore preloaded lesson visibility on the live dashboard at smarthinkerzmicrolearning.com
-- [ ] Restore live AI lesson generation after the reported provider failure
-- [ ] Verify smarthinkerzmicrolearning.com routes to the Vercel production deployment before applying the AI fix
-- [ ] Replace the ElevenLabs key identifier with the corresponding secret TTS API key in the Vercel production configuration
-- [ ] Verify that the current Vercel production deployment receives the updated ElevenLabs secret after redeployment
-- [ ] Run a live Vercel TTS synthesis check using the newly deployed ElevenLabs secret
-- [ ] Replace the missing production audio bucket with Supabase Storage for generated voice narration
-- [ ] Fix newly saved shifts not appearing on the My Shifts screen
-- [ ] Verify the Vercel-served My Shifts page renders the saved shift card rather than persistent skeletons
-- [ ] Fix the Analytics page React hook-order error
-- [ ] Correct the system-check AI/LLM status to inspect the actual Vercel LLM credential configuration
+- [x] Restore live AI lesson generation after the reported provider failure
+- [x] Verify smarthinkerzmicrolearning.com routes to the Vercel production deployment before applying the AI fix
+- [x] Replace the ElevenLabs key identifier with the corresponding secret TTS API key in the Vercel production configuration
+- [x] Verify that the current Vercel production deployment receives the updated ElevenLabs secret after redeployment
+- [x] Run a live Vercel TTS synthesis check using the newly deployed ElevenLabs secret
+- [x] Replace the missing production audio bucket with Supabase Storage for generated voice narration
+- [x] Fix newly saved shifts not appearing on the My Shifts screen
+- [x] Verify the Vercel-served My Shifts page renders the saved shift card rather than persistent skeletons
+- [x] Fix the Analytics page React hook-order error
+- [x] Correct the system-check AI/LLM status to inspect the actual Vercel LLM credential configuration
