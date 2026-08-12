@@ -157,18 +157,19 @@ async function checkTapPayments(): Promise<ServiceStatus> {
 async function checkLLMService(): Promise<ServiceStatus> {
   const start = Date.now();
   try {
-    const apiUrl = process.env.BUILT_IN_FORGE_API_URL;
-    const apiKey = process.env.BUILT_IN_FORGE_API_KEY;
+    const apiUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiUrl || !apiKey) {
       return {
         name: "AI/LLM Service",
         status: "unknown",
         latencyMs: null,
         lastChecked: Date.now(),
-        message: "API credentials not configured",
+        message: "OPENAI_API_KEY is not configured",
       };
     }
-    const res = await fetch(`${apiUrl}/v1/models`, {
+    const modelsUrl = apiUrl.endsWith("/v1") ? `${apiUrl}/models` : `${apiUrl}/v1/models`;
+    const res = await fetch(modelsUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(5000),

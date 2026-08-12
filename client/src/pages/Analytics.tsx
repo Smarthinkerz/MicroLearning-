@@ -10,6 +10,7 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 export default function Analytics() {
   const { user } = useAuth();
   const orgId = (user as any)?.orgId;
+  const { can } = useEntitlements();
 
   const { data: stats, isLoading } = trpc.org.getStats.useQuery(
     { orgId: orgId! },
@@ -39,8 +40,6 @@ export default function Analytics() {
   const completedAssignments = stats?.completedAssignments ?? 0;
   const inProgressAssignments = stats?.inProgressAssignments ?? 0;
   const pendingAssignments = totalAssignments - completedAssignments - inProgressAssignments;
-
-  const { can } = useEntitlements();
 
   return (
     <div className="space-y-6">

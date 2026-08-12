@@ -42,30 +42,49 @@ interface VoiceInfo {
   preview_url: string;
 }
 
+export function isElevenLabsConfiguredValue(apiKey?: string): boolean {
+  return Boolean(apiKey?.trim());
+}
+
+function requireElevenLabsApiKey(): string {
+  const apiKey = ENV.elevenLabsApiKey.trim();
+  if (!apiKey) {
+    throw new Error("ElevenLabs API key is not configured");
+  }
+  return apiKey;
+}
+
+function createElevenLabsError(operation: string, status: number, error: string): Error {
+  if (error.includes("api_key_id_used_as_api_key")) {
+    return new Error(
+      "ElevenLabs rejected the configured credential because it is a key ID, not the secret API key. Copy the secret value shown when the key is created or rotated."
+    );
+  }
+  return new Error(`ElevenLabs ${operation} error: ${status} ${error}`);
+}
+
 /**
  * Check if ElevenLabs is configured
  */
 export function isElevenLabsConfigured(): boolean {
-  return !!ENV.elevenLabsApiKey;
+  return isElevenLabsConfiguredValue(ENV.elevenLabsApiKey);
 }
 
 /**
  * Get available voices from ElevenLabs
  */
 export async function getVoices(): Promise<VoiceInfo[]> {
-  if (!isElevenLabsConfigured()) {
-    throw new Error("ElevenLabs API key not configured");
-  }
+  const apiKey = requireElevenLabsApiKey();
 
   const res = await fetch(`${ELEVENLABS_BASE_URL}/voices`, {
     headers: {
-      "xi-api-key": ENV.elevenLabsApiKey,
+      "xi-api-key": apiKey,
     },
   });
 
   if (!res.ok) {
     const error = await res.text();
-    throw new Error(`ElevenLabs API error: ${res.status} ${error}`);
+    throw createElevenLabsError("API", res.status, error);
   }
 
   const data = await res.json();
@@ -77,9 +96,7 @@ export async function getVoices(): Promise<VoiceInfo[]> {
  * Returns audio as a Buffer (MP3 format)
  */
 export async function textToSpeech(options: TextToSpeechOptions): Promise<Buffer> {
-  if (!isElevenLabsConfigured()) {
-    throw new Error("ElevenLabs API key not configured");
-  }
+  const apiKey = requireElevenLabsApiKey();
 
   const voiceId = options.voiceId || VOICES.sarah;
   const modelId = options.modelId || "eleven_multilingual_v2";
@@ -87,7 +104,7 @@ export async function textToSpeech(options: TextToSpeechOptions): Promise<Buffer
   const res = await fetch(`${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`, {
     method: "POST",
     headers: {
-      "xi-api-key": ENV.elevenLabsApiKey,
+      "xi-api-key": apiKey,
       "Content-Type": "application/json",
       "Accept": "audio/mpeg",
     },
@@ -105,7 +122,7 @@ export async function textToSpeech(options: TextToSpeechOptions): Promise<Buffer
 
   if (!res.ok) {
     const error = await res.text();
-    throw new Error(`ElevenLabs TTS error: ${res.status} ${error}`);
+    throw createElevenLabsError("TTS", res.status, error);
   }
 
   const arrayBuffer = await res.arrayBuffer();
@@ -116,9 +133,7 @@ export async function textToSpeech(options: TextToSpeechOptions): Promise<Buffer
  * Convert text to speech and return as a streaming response
  */
 export async function textToSpeechStream(options: TextToSpeechOptions): Promise<ReadableStream<Uint8Array>> {
-  if (!isElevenLabsConfigured()) {
-    throw new Error("ElevenLabs API key not configured");
-  }
+  const apiKey = requireElevenLabsApiKey();
 
   const voiceId = options.voiceId || VOICES.sarah;
   const modelId = options.modelId || "eleven_multilingual_v2";
@@ -126,7 +141,7 @@ export async function textToSpeechStream(options: TextToSpeechOptions): Promise<
   const res = await fetch(`${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}/stream`, {
     method: "POST",
     headers: {
-      "xi-api-key": ENV.elevenLabsApiKey,
+      "xi-api-key": apiKey,
       "Content-Type": "application/json",
       "Accept": "audio/mpeg",
     },
@@ -144,7 +159,7 @@ export async function textToSpeechStream(options: TextToSpeechOptions): Promise<
 
   if (!res.ok) {
     const error = await res.text();
-    throw new Error(`ElevenLabs TTS stream error: ${res.status} ${error}`);
+    throw createElevenLabsError("TTS stream", res.status, error);
   }
 
   if (!res.body) {
@@ -158,19 +173,17 @@ export async function textToSpeechStream(options: TextToSpeechOptions): Promise<
  * Get user subscription info (remaining characters, etc.)
  */
 export async function getSubscriptionInfo() {
-  if (!isElevenLabsConfigured()) {
-    throw new Error("ElevenLabs API key not configured");
-  }
+  const apiKey = requireElevenLabsApiKey();
 
   const res = await fetch(`${ELEVENLABS_BASE_URL}/user/subscription`, {
     headers: {
-      "xi-api-key": ENV.elevenLabsApiKey,
+      "xi-api-key": apiKey,
     },
   });
 
   if (!res.ok) {
     const error = await res.text();
-    throw new Error(`ElevenLabs subscription error: ${res.status} ${error}`);
+    throw createElevenLabsError("subscription", res.status, error);
   }
 
   return res.json();

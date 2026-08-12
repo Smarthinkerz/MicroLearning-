@@ -17,8 +17,9 @@ export default function Shifts() {
   const orgId = (user as any)?.orgId;
   const utils = trpc.useUtils();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [referenceTime] = useState(() => Date.now());
 
-  const now = Date.now();
+  const now = referenceTime;
   const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
   const twoWeeksAhead = now + 14 * 24 * 60 * 60 * 1000;
 
