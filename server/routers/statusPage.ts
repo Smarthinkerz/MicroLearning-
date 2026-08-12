@@ -206,18 +206,26 @@ async function checkElevenLabs(): Promise<ServiceStatus> {
         message: "API key not configured",
       };
     }
-    const res = await fetch("https://api.elevenlabs.io/v1/voices", {
-      method: "GET",
-      headers: { "xi-api-key": apiKey },
+    // A key limited to Text-to-Speech may not have permission to list voices.
+    // An intentionally empty request validates the TTS permission without spending credits.
+    const res = await fetch("https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL", {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify({ text: "", model_id: "eleven_multilingual_v2" }),
       signal: AbortSignal.timeout(5000),
     });
     const latency = Date.now() - start;
+    const authorized = res.ok || res.status === 400 || res.status === 422;
     return {
       name: "Voice Service (ElevenLabs)",
-      status: res.ok ? (latency < 2000 ? "operational" : "degraded") : "down",
+      status: authorized ? (latency < 2000 ? "operational" : "degraded") : "down",
       latencyMs: latency,
       lastChecked: Date.now(),
-      message: res.ok ? "Voices endpoint reachable" : `HTTP ${res.status}`,
+      message: authorized ? "Text-to-Speech authorization confirmed" : `HTTP ${res.status}`,
     };
   } catch (err: any) {
     return {
