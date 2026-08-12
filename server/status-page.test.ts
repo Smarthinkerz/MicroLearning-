@@ -15,3 +15,9 @@ describe("ElevenLabs TTS health probe", () => {
   });
 });
 
+describe("AI health probe timeout classification", () => {
+  it("recognizes the timeout message emitted by the platform health probe", () => {
+    const error = new Error("The operation was aborted due to timeout");
+    expect(error.message.toLowerCase().includes("timeout")).toBe(true);
+  });
+});

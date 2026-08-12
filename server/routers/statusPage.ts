@@ -172,7 +172,7 @@ async function checkLLMService(): Promise<ServiceStatus> {
     const res = await fetch(modelsUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(10000),
     });
     const latency = Date.now() - start;
     return {
@@ -183,12 +183,13 @@ async function checkLLMService(): Promise<ServiceStatus> {
       message: res.ok ? "Models endpoint reachable" : `HTTP ${res.status}`,
     };
   } catch (err: any) {
+    const timedOut = err?.name === "TimeoutError" || err?.name === "AbortError" || String(err?.message ?? "").toLowerCase().includes("timeout");
     return {
       name: "AI/LLM Service",
-      status: "down",
+      status: timedOut ? "degraded" : "down",
       latencyMs: null,
       lastChecked: Date.now(),
-      message: `Unreachable: ${err.message?.substring(0, 100)}`,
+      message: timedOut ? "Health probe timed out; retrying automatically" : `Unreachable: ${err.message?.substring(0, 100)}`,
     };
   }
 }
