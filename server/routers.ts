@@ -144,7 +144,14 @@ const shiftRouter = router({
     isRecurring: z.boolean().optional(),
     recurrenceRule: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
-    return db.createShift({ ...input, source: "manual" });
+    const shift = await db.createShift({ ...input, source: "manual" });
+    if (!shift) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Unable to save your shift. Please try again.",
+      });
+    }
+    return shift;
   }),
   getMyShifts: protectedProcedure.input(z.object({
     startRange: z.number().optional(),

@@ -467,6 +467,12 @@ export async function getAllPlatformSettings() {
 }
 
 // ─── Org Stats ───────────────────────────────────────────────────────
+export function calculateCompletionRate(total: number | string | null | undefined, completed: number | string | null | undefined): number {
+  const totalAssignments = Number(total ?? 0);
+  const completedAssignments = Number(completed ?? 0);
+  return totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+}
+
 export async function getOrgStats(orgId: number) {
   const db = await getDb();
   if (!db) return null;
@@ -485,9 +491,7 @@ export async function getOrgStats(orgId: number) {
     completedAssignments: Number(assignmentStats?.completed ?? 0),
     inProgressAssignments: Number(assignmentStats?.inProgress ?? 0),
     totalShifts: Number(shiftCount?.count ?? 0),
-    completionRate: assignmentStats?.total
-      ? Math.round((Number(assignmentStats.completed ?? 0) / Number(assignmentStats.total)) * 100)
-      : 0,
+    completionRate: calculateCompletionRate(assignmentStats?.total, assignmentStats?.completed),
   };
 }
 
@@ -1615,4 +1619,3 @@ export async function getUserByOpenId(openId: string) {
 }
 
 /** Fix breach notified field — alias using notifiedAt */
-
